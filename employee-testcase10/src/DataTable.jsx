@@ -8,8 +8,17 @@ const DataTable = () => {
     const [successMessage, setSuccessMessage] = useState("");
 
     useEffect(() => {
-        // Fetch initial data
-        axios.get(API_URL).then((response) => setEmployees(response.data));
+        axios.get(API_URL)
+            .then((response) => {
+                if (response.data && response.data.data) {
+                    setEmployees(response.data.data);
+                } else {
+                    console.error("Unexpected response format:", response);
+                }
+            })
+            .catch((error) => {
+                console.error("Error fetching data:", error.response?.data || error.message);
+            });
     }, []);
 
     const handleInputChange = (index, key, value) => {
@@ -18,31 +27,89 @@ const DataTable = () => {
         setEmployees(updatedEmployees);
     };
 
-    const handleSave = (employee) => {
-        axios.put(`${API_URL}/${employee.id}`, employee)
-            .then(() => setSuccessMessage("Data saved successfully!"));
-    };
-
     const handleAddRow = () => {
-        setEmployees([...employees, { id: "", name: "", position: "", salary: "" }]);
-    };
-
-    const handleDeleteRows = () => {
-        const remainingEmployees = employees.filter((employee) => !employee.selected);
-        setEmployees(remainingEmployees);
-        // Implement API call for deletion if required
+        setEmployees([...employees, { id: null, name: "", position: "", salary: "" }]);
     };
 
     const handleBulkSave = () => {
-        axios.put(API_URL, employees).then(() => setSuccessMessage("All changes saved successfully!"));
+        const validEmployees = employees.filter(emp => emp.name && emp.position && emp.salary);
+
+        const newEmployees = validEmployees.filter(emp => !emp.id);
+        const updatedEmployees = validEmployees.filter(emp => emp.id);
+
+        const postData = newEmployees.map(employee => ({
+            name: employee.name,
+            position: employee.position,
+            salary: employee.salary
+        }));
+
+        if (postData.length > 0) {
+            axios.post(API_URL, postData, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }).then(() => {
+                setSuccessMessage("Berhasil menambahkan data employee!");
+            }).catch((error) => {
+                console.error("Error adding new employees:", error.response?.data || error.message);
+                alert("An error occurred while adding new employees: " + (error.response?.data?.message || error.message));
+            });
+        }
+
+        const putData = updatedEmployees.map(employee => ({
+            id: employee.id,
+            name: employee.name,
+            position: employee.position,
+            salary: employee.salary
+        }));
+
+        if (putData.length > 0) {
+            axios.put(`${API_URL}/update`, putData, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }).then(() => {
+                setSuccessMessage("Berhasil memperbarui data employee!");
+            }).catch((error) => {
+                console.error("Error updating employees:", error.response?.data || error.message);
+                alert("An error occurred while updating employees: " + (error.response?.data?.message || error.message));
+            });
+        }
+    };
+
+    const handleDeleteRows = () => {
+        const selectedIds = employees
+            .filter(employee => employee.selected)
+            .map(employee => employee.id);
+
+        if (selectedIds.length === 0) {
+            alert("Please select employees to delete.");
+            return;
+        }
+        axios.delete(`${API_URL}/delete`, {
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            data: selectedIds
+        })
+        .then(() => {
+            const remainingEmployees = employees.filter(employee => !employee.selected);
+            setEmployees(remainingEmployees);
+            setSuccessMessage("Employee yang dipilih berhasil dihapus!");
+        })
+        .catch((error) => {
+            console.error("Error deleting employees:", error.response?.data || error.message);
+            alert("An error occurred while deleting employees: " + (error.response?.data?.message || error.message));
+        });
     };
 
     return (
         <div className="p-4">
             {successMessage && <div className="bg-green-500 text-white p-2 mb-4 rounded">{successMessage}</div>}
-            <div className="flex justify-between mb-4">
+            <div className="flex justify-end mb-4 space-x-4">
                 <button onClick={handleBulkSave} className="bg-green-500 text-white px-4 py-2 rounded">Save</button>
                 <button onClick={handleDeleteRows} className="bg-red-500 text-white px-4 py-2 rounded">Delete</button>
+                <button onClick={handleAddRow} className="bg-blue-500 text-white px-4 py-2 rounded">Add Row</button>
             </div>
             <table className="table-auto w-full text-left bg-white rounded shadow-lg">
                 <thead>
@@ -52,7 +119,6 @@ const DataTable = () => {
                         <th className="p-2 border-b">EMPLOYEE NAME</th>
                         <th className="p-2 border-b">POSITION</th>
                         <th className="p-2 border-b">SALARY</th>
-                        <th className="p-2 border-b"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -92,14 +158,6 @@ const DataTable = () => {
                                     placeholder="Insert Salary"
                                     className="w-full border rounded px-2 py-1"
                                 />
-                            </td>
-                            <td className="p-2 border-b">
-                                <button
-                                    onClick={handleAddRow}
-                                    className="bg-blue-500 text-white rounded-full p-2"
-                                >
-                                    <span className="material-icons">add</span>
-                                </button>
                             </td>
                         </tr>
                     ))}
