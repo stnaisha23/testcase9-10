@@ -8,6 +8,7 @@ const DataTable = () => {
     const [originalEmployees, setOriginalEmployees] = useState([]);
     const [successMessage, setSuccessMessage] = useState("");
     const [isDirty, setIsDirty] = useState(false);
+    const [selectAll, setSelectAll] = useState(false);
 
     useEffect(() => {
         axios.get(API_URL)
@@ -125,6 +126,26 @@ const DataTable = () => {
         });
     };
 
+    const handleSelectAll = () => {
+        const updatedSelectAll = !selectAll;
+        const updatedEmployees = employees.map(emp => ({
+            ...emp,
+            selected: updatedSelectAll,
+        }));
+        setEmployees(updatedEmployees);
+        setSelectAll(updatedSelectAll);
+    };
+
+    const handleSelectRow = (index) => {
+        const updatedEmployees = [...employees];
+        updatedEmployees[index].selected = !updatedEmployees[index].selected;
+        setEmployees(updatedEmployees);
+
+        // Check if all rows are selected
+        const allSelected = updatedEmployees.every(emp => emp.selected);
+        setSelectAll(allSelected);
+    };
+
     return (
         <div className="p-4">
             {successMessage && <div className="bg-green-500 text-white p-2 mb-4 rounded">{successMessage}</div>}
@@ -136,7 +157,13 @@ const DataTable = () => {
             <table className="table-auto w-full text-left bg-white rounded shadow-lg">
                 <thead>
                     <tr>
-                        <th className="p-2 border-b"><input type="checkbox" /></th>
+                        <th className="p-2 border-b">
+                            <input
+                                type="checkbox"
+                                checked={selectAll}
+                                onChange={handleSelectAll}
+                            />
+                        </th>
                         <th className="p-2 border-b">EMPLOYEE ID</th>
                         <th className="p-2 border-b">EMPLOYEE NAME</th>
                         <th className="p-2 border-b">POSITION</th>
@@ -147,12 +174,11 @@ const DataTable = () => {
                     {employees.map((employee, index) => (
                         <tr key={index}>
                             <td className="p-2 border-b">
-                                <input type="checkbox" onChange={() => {
-                                    const updatedEmployees = [...employees];
-                                    updatedEmployees[index].selected = !updatedEmployees[index].selected;
-                                    setEmployees(updatedEmployees);
-                                    setIsDirty(true);
-                                }} />
+                                <input
+                                    type="checkbox"
+                                    checked={employee.selected || false}
+                                    onChange={() => handleSelectRow(index)}
+                                />
                             </td>
                             <td className="p-2 border-b">{employee.id || index + 1}</td>
                             <td className="p-2 border-b">
