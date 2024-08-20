@@ -5,13 +5,16 @@ const API_URL = "http://localhost:8080/api/employees";
 
 const DataTable = () => {
     const [employees, setEmployees] = useState([]);
+    const [originalEmployees, setOriginalEmployees] = useState([]);
     const [successMessage, setSuccessMessage] = useState("");
+    const [isDirty, setIsDirty] = useState(false);
 
     useEffect(() => {
         axios.get(API_URL)
             .then((response) => {
                 if (response.data && response.data.data) {
                     setEmployees(response.data.data);
+                    setOriginalEmployees(response.data.data);
                 } else {
                     console.error("Unexpected response format:", response);
                 }
@@ -21,48 +24,66 @@ const DataTable = () => {
             });
     }, []);
 
+    useEffect(() => {
+        const autosaveInterval = setInterval(() => {
+            if (isDirty) {
+                handleBulkSave();
+            }
+        }, 60000);
+
+        return () => clearInterval(autosaveInterval);
+    }, [isDirty, employees]);
+
     const handleInputChange = (index, key, value) => {
         const updatedEmployees = [...employees];
         updatedEmployees[index][key] = value;
         setEmployees(updatedEmployees);
+        setIsDirty(true);
     };
 
     const handleAddRow = () => {
         setEmployees([...employees, { id: null, name: "", position: "", salary: "" }]);
+        setIsDirty(true);
     };
 
     const handleBulkSave = () => {
         const validEmployees = employees.filter(emp => emp.name && emp.position && emp.salary);
-
+    
         const newEmployees = validEmployees.filter(emp => !emp.id);
         const updatedEmployees = validEmployees.filter(emp => emp.id);
-
+    
         const postData = newEmployees.map(employee => ({
             name: employee.name,
             position: employee.position,
             salary: employee.salary
         }));
-
+    
         if (postData.length > 0) {
             axios.post(API_URL, postData, {
                 headers: {
                     'Content-Type': 'application/json'
                 }
-            }).then(() => {
+            }).then((response) => {
                 setSuccessMessage("Berhasil menambahkan data employee!");
+                const addedEmployees = response.data.data;
+                const updatedEmployeeList = employees.map(emp => {
+                    const addedEmployee = addedEmployees.find(ae => ae.name === emp.name && ae.position === emp.position && ae.salary === emp.salary);
+                    return addedEmployee ? { ...emp, id: addedEmployee.id } : emp;
+                });
+                setEmployees(updatedEmployeeList);
             }).catch((error) => {
                 console.error("Error adding new employees:", error.response?.data || error.message);
                 alert("An error occurred while adding new employees: " + (error.response?.data?.message || error.message));
             });
         }
-
+    
         const putData = updatedEmployees.map(employee => ({
             id: employee.id,
             name: employee.name,
             position: employee.position,
             salary: employee.salary
         }));
-
+    
         if (putData.length > 0) {
             axios.put(`${API_URL}/update`, putData, {
                 headers: {
@@ -70,6 +91,7 @@ const DataTable = () => {
                 }
             }).then(() => {
                 setSuccessMessage("Berhasil memperbarui data employee!");
+                setIsDirty(false);
             }).catch((error) => {
                 console.error("Error updating employees:", error.response?.data || error.message);
                 alert("An error occurred while updating employees: " + (error.response?.data?.message || error.message));
@@ -129,6 +151,7 @@ const DataTable = () => {
                                     const updatedEmployees = [...employees];
                                     updatedEmployees[index].selected = !updatedEmployees[index].selected;
                                     setEmployees(updatedEmployees);
+                                    setIsDirty(true);
                                 }} />
                             </td>
                             <td className="p-2 border-b">{employee.id || index + 1}</td>
